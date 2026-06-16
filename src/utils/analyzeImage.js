@@ -1,0 +1,69 @@
+// Generates a deterministic integer from the first bytes of a data URL.
+// Same image always produces the same number, giving the impression of
+// image-based analysis without a real Vision API.
+function imageHash(dataUrl) {
+  let hash = 0
+  const sample = dataUrl.slice(22, 222) // skip the "data:image/...;base64," prefix
+  for (let i = 0; i < sample.length; i++) {
+    hash = (hash * 31 + sample.charCodeAt(i)) & 0x0fffffff
+  }
+  return hash
+}
+
+// Mood profiles per species — one entry per result type, in the same order as mockResults.js.
+// When a real Vision API is connected, replace this function body with an API call
+// that returns { species, moodKeywords, visualHint, _index }.
+const MOOD_POOLS = {
+  human: [
+    { keywords: ['신뢰감', '차분함', '은근한 매력'],      hint: '차분하고 신뢰감 있는 첫인상' },
+    { keywords: ['호감', '밝은 에너지', '친근함'],         hint: '밝고 긍정적인 에너지가 느껴지는 인상' },
+    { keywords: ['도도함', '독립적', '미스터리'],           hint: '쉽게 다가오지 않는 듯한 분위기' },
+    { keywords: ['따뜻함', '공감 능력', '포용력'],          hint: '다가가고 싶은 따뜻한 분위기' },
+    { keywords: ['존재감', '자기 확신', '묵직한 카리스마'], hint: '말 없이도 눈길이 가는 존재감' },
+    { keywords: ['감성', '독특한 분위기', '예술적 감각'],   hint: '뭔가 사연이 있어 보이는 분위기' },
+  ],
+  cat: [
+    { keywords: ['도도함', '품위', '카리스마'],              hint: '왕족 같은 품위가 느껴지는 냥상' },
+    { keywords: ['끈질김', '표현력', '귀여운 고집'],         hint: '원하는 게 분명한 귀여운 고집' },
+    { keywords: ['눈빛', '존재감', '무언의 지배력'],         hint: '눈빛으로 다 말하는 강한 존재감' },
+    { keywords: ['여유', '관조', '느긋한 카리스마'],         hint: '모든 걸 지켜보는 여유로운 냥상' },
+    { keywords: ['예측불가', '폭발적 에너지', '자유로운 영혼'], hint: '언제 달릴지 모르는 자유로운 에너지' },
+    { keywords: ['관찰력', '집착 아닌 관심', '충성심'],     hint: '집사를 철저히 감시하는 충성스러운 냥상' },
+  ],
+  dog: [
+    { keywords: ['친화력', '사교성', '밝은 에너지'],        hint: '누구에게나 먼저 달려가는 밝은 에너지' },
+    { keywords: ['열정', '긍정 에너지', '추진력'],           hint: '세상 모든 것이 신나는 폭발적인 에너지' },
+    { keywords: ['집중력', '충성심', '솔직한 욕망'],         hint: '원하는 게 있을 때 눈에 불꽃이 튀는 집중력' },
+    { keywords: ['애교', '사랑스러움', '눈빛 공격'],         hint: '눈 한 번으로 마음을 녹이는 애교' },
+    { keywords: ['경계심', '충성심', '책임감'],              hint: '가족을 지키는 진지한 책임감' },
+    { keywords: ['순수함', '밝음', '무한 긍정'],             hint: '세상 모든 것이 좋아 보이는 해맑은 에너지' },
+  ],
+}
+
+/**
+ * Generates an analysis summary from the uploaded image.
+ *
+ * Currently uses a deterministic image hash to simulate analysis —
+ * the same photo always produces the same result, which feels like
+ * real image-based analysis.
+ *
+ * To connect a real Vision API: replace this function body with an
+ * async API call. The return shape must stay the same:
+ *   { species, moodKeywords, visualHint, _index }
+ *
+ * _index is an internal field used to pick the matching result type
+ * from the pool. A real API would set _index by matching detected
+ * traits to the closest pool entry.
+ */
+export function generateAnalysisSummary(species = 'human', dataUrl = '') {
+  const pool = MOOD_POOLS[species] ?? MOOD_POOLS.human
+  const index = imageHash(dataUrl) % pool.length
+  const entry = pool[index]
+
+  return {
+    species,
+    moodKeywords: entry.keywords,
+    visualHint: entry.hint,
+    _index: index,
+  }
+}
