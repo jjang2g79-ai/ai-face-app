@@ -101,3 +101,23 @@ When a new decision is made during a task, append it here before closing the tas
 **Reason:** html2canvas cannot render blob URLs reliably (CORS taint). Data URLs are self-contained and work cross-browser including Safari iOS.  
 **Alternatives considered:** Object URL via `URL.createObjectURL` (simpler, but breaks html2canvas export).  
 **Consequences:** Large photos held in memory as base64 strings. Acceptable at MVP given single-photo flow with no persistence.
+
+## 2026-09-02 — Vision API 연결
+
+**결정**: 이미지 분석을 해시 기반 시뮬레이션에서 OpenAI Vision 호출로 교체.
+
+**배경**: `analyzeImage.js`가 data URL의 앞부분을 해시로 바꿔 결과 풀에서 하나를 고르고 있었다.
+사진 내용과 무관하므로 회색 단색 이미지에도 정상 결과가 나왔다.
+
+**적용**
+- `generateAnalysisSummary`가 async가 되고 `gpt-4o-mini` 비전 호출을 사용한다.
+- 응답은 `{ found, observed, index }` JSON. `observed`가 결과 카드의 "AI가 본 첫 느낌"에 들어간다.
+- 요청한 종을 찾지 못하면(`found: false`) 결과 대신 `NotFoundScreen`을 보여준다.
+- API 실패·타임아웃(20초) 시 기존 해시 로직으로 폴백한다. 결과 화면이 비는 경우는 없다.
+- 새 의존성 없음. `fetch`만 사용.
+
+**함께 고친 것**: `ResultCard.jsx`가 고양이·강아지의 경우 `result.analysisPool`에서 문구를 다시 뽑아
+API 관찰을 덮어쓰고 있었다. 실제 관찰(`analyzed: true`)이 있으면 그것을 우선하도록 변경.
+
+**남은 문제**: `VITE_` 접두 환경변수는 클라이언트 번들에 그대로 포함된다.
+현재는 로컬 실행 전용이므로 허용하지만, 배포하려면 서버 프록시가 필요하다.

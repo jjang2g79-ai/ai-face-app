@@ -3,6 +3,7 @@ import LandingScreen from './components/LandingScreen'
 import UploadScreen from './components/UploadScreen'
 import LoadingScreen from './components/LoadingScreen'
 import ResultScreen from './components/ResultScreen'
+import NotFoundScreen from './components/NotFoundScreen'
 import { getResultBySpeciesIndex } from './data/mockResults'
 import { generateAnalysisSummary } from './utils/analyzeImage'
 
@@ -11,6 +12,7 @@ const SCREENS = {
   UPLOAD: 'upload',
   LOADING: 'loading',
   RESULT: 'result',
+  NOT_FOUND: 'notFound',
 }
 
 export default function App() {
@@ -26,11 +28,16 @@ export default function App() {
     setScreen(SCREENS.LOADING)
   }
 
-  function handleLoadingDone() {
-    const summary = generateAnalysisSummary(species, photo)
-    const picked = getResultBySpeciesIndex(species, summary._index)
+  async function handleLoadingDone() {
+    const summary = await generateAnalysisSummary(species, photo)
     setAnalysisSummary(summary)
-    setResult(picked)
+
+    if (summary.found === false) {
+      setScreen(SCREENS.NOT_FOUND)
+      return
+    }
+
+    setResult(getResultBySpeciesIndex(species, summary._index))
     setScreen(SCREENS.RESULT)
   }
 
@@ -52,6 +59,15 @@ export default function App() {
       )}
       {screen === SCREENS.LOADING && (
         <LoadingScreen photo={photo} species={species} onDone={handleLoadingDone} />
+      )}
+      {screen === SCREENS.NOT_FOUND && (
+        <NotFoundScreen
+          photo={photo}
+          species={species}
+          observed={analysisSummary?.visualHint}
+          onRetry={() => setScreen(SCREENS.UPLOAD)}
+          onRestart={handleRestart}
+        />
       )}
       {screen === SCREENS.RESULT && (
         <ResultScreen

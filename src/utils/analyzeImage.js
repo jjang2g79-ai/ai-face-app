@@ -1,18 +1,14 @@
-// Generates a deterministic integer from the first bytes of a data URL.
-// Same image always produces the same number, giving the impression of
-// image-based analysis without a real Vision API.
+// Fallback only: used when the Vision API is unreachable, so the result screen
+// never renders empty. Same photo always yields the same entry.
 function imageHash(dataUrl) {
   let hash = 0
-  const sample = dataUrl.slice(22, 222) // skip the "data:image/...;base64," prefix
+  const sample = dataUrl.slice(22, 222)
   for (let i = 0; i < sample.length; i++) {
     hash = (hash * 31 + sample.charCodeAt(i)) & 0x0fffffff
   }
   return hash
 }
 
-// Mood profiles per species — one entry per result type, in the same order as mockResults.js.
-// When a real Vision API is connected, replace this function body with an API call
-// that returns { species, moodKeywords, visualHint, _index }.
 const MOOD_POOLS = {
   human: [
     { keywords: ['신뢰감', '차분함', '은근한 매력'],      hint: '차분하고 신뢰감 있는 첫인상' },
@@ -40,30 +36,104 @@ const MOOD_POOLS = {
   ],
 }
 
-/**
- * Generates an analysis summary from the uploaded image.
- *
- * Currently uses a deterministic image hash to simulate analysis —
- * the same photo always produces the same result, which feels like
- * real image-based analysis.
- *
- * To connect a real Vision API: replace this function body with an
- * async API call. The return shape must stay the same:
- *   { species, moodKeywords, visualHint, _index }
- *
- * _index is an internal field used to pick the matching result type
- * from the pool. A real API would set _index by matching detected
- * traits to the closest pool entry.
- */
-export function generateAnalysisSummary(species = 'human', dataUrl = '') {
+const SPECIES_KO = { human: '사람', cat: '고양이', dog: '강아지' }
+
+const API_KEY = import.meta.env.VITE_OPENAI_API_KEY
+const MODEL = 'gpt-4o-mini'
+const TIMEOUT_MS = 20000
+
+function buildPrompt(species, pool) {
+  const target = SPECIES_KO[species] ?? '사람'
+  const options = pool.map((e, i) => `${i}: ${e.hint}`).join('\n')
+  return [
+    `이 사진을 보고 아래를 판단해줘. 사용자는 "${target}"의 관상을 요청했다.`,
+    '',
+    '보기:',
+    options,
+    '',
+    '다음 JSON만 출력해라. 설명 금지.',
+    '{',
+    `  "found": true/false,          // 사진에 ${target}이(가) 실제로 있으면 true`,
+    '  "observed": "사진에 보이는 것을 한국어 한 문장으로. 20자 내외",',
+    '  "index": 0~5                  // 보기 중 사진의 인상과 가장 가까운 번호',
+    '}',
+    '',
+    `observed에는 사진이 없다고 쓰지 말고, 화면에 실제로 보이는 것을 적어라.`,
+    `${target}이(가) 없으면 found를 false로 하고 observed에는 대신 무엇이 보이는지 적어라.`,
+    '(예: "회색 배경만 있고 아무것도 없음", "키보드와 책상만 보임")',
+  ].join('\n')
+}
+
+async function askVision(species, dataUrl, pool) {
+  if (!API_KEY) return null
+
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS)
+  try {
+    const res = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      signal: controller.signal,
+      body: JSON.stringify({
+        model: MODEL,
+        max_tokens: 200,
+        response_format: { type: 'json_object' },
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'text', text: buildPrompt(species, pool) },
+            { type: 'image_url', image_url: { url: dataUrl, detail: 'low' } },
+          ],
+        }],
+      }),
+    })
+    if (!res.ok) {
+      console.error('[vision] HTTP', res.status, (await res.text()).slice(0, 200))
+      return null
+    }
+    const json = await res.json()
+    const parsed = JSON.parse(json.choices[0].message.content)
+    const index = Number.isInteger(parsed.index) ? parsed.index : 0
+    return {
+      found: parsed.found !== false,
+      observed: String(parsed.observed ?? '').trim(),
+      index: ((index % pool.length) + pool.length) % pool.length,
+    }
+  } catch (err) {
+    console.error('[vision] 실패:', err?.message ?? err)
+    return null
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+export async function generateAnalysisSummary(species = 'human', dataUrl = '') {
   const pool = MOOD_POOLS[species] ?? MOOD_POOLS.human
+  const vision = await askVision(species, dataUrl, pool)
+
+  if (vision) {
+    const entry = pool[vision.index]
+    return {
+      species,
+      moodKeywords: entry.keywords,
+      visualHint: vision.observed || entry.hint,
+      _index: vision.index,
+      found: vision.found,
+      analyzed: true,
+    }
+  }
+
   const index = imageHash(dataUrl) % pool.length
   const entry = pool[index]
-
   return {
     species,
     moodKeywords: entry.keywords,
     visualHint: entry.hint,
     _index: index,
+    found: true,
+    analyzed: false,
   }
 }

@@ -69,9 +69,14 @@ export default function ResultCard({ photo, result, analysisSummary, cardRef }) 
     }
 
     // ── "AI가 본 첫 느낌" ────────────────────────────────────
-    let hint = analysisSummary?.visualHint ?? FALLBACK_HINTS[species] ?? FALLBACK_HINTS.human
-    if (species !== 'human' && result.analysisPool?.length) {
+    // A real observation from the Vision API always wins over the canned pool
+    let hint
+    if (analysisSummary?.analyzed && analysisSummary.visualHint) {
+      hint = analysisSummary.visualHint
+    } else if (species !== 'human' && result.analysisPool?.length) {
       hint = pickFrom(result.analysisPool, (seed >> 2))
+    } else {
+      hint = analysisSummary?.visualHint ?? FALLBACK_HINTS[species] ?? FALLBACK_HINTS.human
     }
 
     return { displayDescription: desc, visualHint: hint }
@@ -84,6 +89,7 @@ export default function ResultCard({ photo, result, analysisSummary, cardRef }) 
     result.description,
     analysisSummary?._index,
     analysisSummary?.visualHint,
+    analysisSummary?.analyzed,
     species,
   ])
 
