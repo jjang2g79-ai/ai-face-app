@@ -90,14 +90,16 @@ export async function generateAnalysisSummary(species = 'human', dataUrl = '') {
     }
   }
 
-  const index = imageHash(dataUrl) % pool.length
-  const entry = pool[index]
+  // 분석에 실패했으면 미리 써둔 문구로 결과를 지어내지 않는다.
+  // 예전에는 여기서 해시로 아무거나 골라 보여줬고, 쓰는 사람은 그게 진짜인 줄 알았다.
+  // 화면을 채우는 것보다 못 했다고 말하는 쪽이 맞다.
   return {
     species,
-    moodKeywords: entry.keywords,
-    visualHint: entry.hint,
-    _index: index,
-    found: true,
+    moodKeywords: [],
+    visualHint: '',
+    _index: imageHash(dataUrl) % pool.length,
+    found: false,
     analyzed: false,
+    failed: true,
   }
 }

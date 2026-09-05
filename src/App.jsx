@@ -65,6 +65,7 @@ export default function App() {
           photo={photo}
           species={species}
           observed={analysisSummary?.visualHint}
+          failed={analysisSummary?.failed}
           onRetry={() => setScreen(SCREENS.UPLOAD)}
           onRestart={handleRestart}
         />

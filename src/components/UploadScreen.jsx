@@ -17,12 +17,42 @@ export default function UploadScreen({ onAnalyze }) {
   const [species, setSpecies] = useState('human')
   const inputRef = useRef(null)
 
-  function handleFileChange(e) {
+  // 폰 사진은 원본이 3~8MB라 그대로 보내면 서버가 거절한다.
+  // 분석은 저해상도로 하므로 긴 변 1024px, JPEG 로 줄여서 보낸다 (보통 100~200KB).
+  const MAX_SIDE = 1024
+
+  function shrink(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onerror = () => reject(new Error('파일을 읽지 못했습니다'))
+      reader.onload = (ev) => {
+        const img = new Image()
+        img.onerror = () => reject(new Error('이미지를 열지 못했습니다'))
+        img.onload = () => {
+          const scale = Math.min(1, MAX_SIDE / Math.max(img.width, img.height))
+          const w = Math.round(img.width * scale)
+          const h = Math.round(img.height * scale)
+          const canvas = document.createElement('canvas')
+          canvas.width = w
+          canvas.height = h
+          canvas.getContext('2d').drawImage(img, 0, 0, w, h)
+          resolve(canvas.toDataURL('image/jpeg', 0.85))
+        }
+        img.src = ev.target.result
+      }
+      reader.readAsDataURL(file)
+    })
+  }
+
+  async function handleFileChange(e) {
     const file = e.target.files[0]
     if (!file) return
-    const reader = new FileReader()
-    reader.onload = (ev) => setPreview(ev.target.result)
-    reader.readAsDataURL(file)
+    try {
+      setPreview(await shrink(file))
+    } catch (err) {
+      console.error('[upload]', err?.message ?? err)
+      alert('사진을 불러오지 못했어요. 다른 사진으로 해보세요.')
+    }
   }
 
   return (
