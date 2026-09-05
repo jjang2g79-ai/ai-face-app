@@ -1,6 +1,6 @@
 const SPECIES_LABEL = { human: '사람을', cat: '고양이를', dog: '강아지를' }
 
-export default function NotFoundScreen({ photo, species, observed, onRetry, onRestart }) {
+export default function NotFoundScreen({ photo, species, observed, failed, onRetry, onRestart }) {
   const label = SPECIES_LABEL[species] ?? '사람을'
 
   return (
@@ -10,10 +10,12 @@ export default function NotFoundScreen({ photo, species, observed, onRetry, onRe
       </div>
 
       <h2 className="text-2xl font-bold text-white text-center mb-3">
-        {label} 못 찾았어요
+        {failed ? '분석을 못 했어요' : `${label} 못 찾았어요`}
       </h2>
       <p className="text-slate-400 text-sm text-center mb-6">
-        이 사진으로는 관상을 볼 수 없어요
+        {failed
+          ? '연결이 불안정하거나 사진이 너무 큰 것 같아요. 다시 해볼까요?'
+          : '이 사진으로는 관상을 볼 수 없어요'}
       </p>
 
       {observed && (
