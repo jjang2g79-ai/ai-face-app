@@ -39,8 +39,15 @@ function buildPrompt(species, hints) {
     '{',
     `  "found": true/false,          // 사진에 ${target}이(가) 실제로 있으면 true`,
     '  "observed": "사진에 보이는 것을 한국어 한 문장으로. 20자 내외",',
+    `  "count": 1,                   // 사진에 보이는 ${target}의 수. 없으면 0`,
+    '  "subject": "",                // count가 2 이상일 때, 관상을 판단한 대상의 위치를 한국어로',
     `  "index": 0~${hints.length - 1}                  // 보기 중 사진의 인상과 가장 가까운 번호`,
     '}',
+    '',
+    `${target}이(가) 여럿이면 가장 크게·정면으로 나온 하나를 골라 index를 매기고,`,
+    'subject에는 그게 누구인지 사진에서 실제로 보이는 위치를 적어라.',
+    '둘이면 "왼쪽"이나 "오른쪽", 셋 이상일 때만 "가운데"를 쓸 수 있다.',
+    'count가 1이면 subject는 빈 문자열로 둔다.',
     '',
     'observed에는 사진이 없다고 쓰지 말고, 화면에 실제로 보이는 것을 적어라.',
     `${target}이(가) 없으면 found를 false로 하고 observed에는 대신 무엇이 보이는지 적어라.`,
@@ -96,11 +103,14 @@ export async function analyze({ body, ip, apiKey }) {
     const json = await res.json()
     const parsed = JSON.parse(json.choices[0].message.content)
     const raw = Number.isInteger(parsed.index) ? parsed.index : 0
+    const count = Number.isInteger(parsed.count) ? Math.max(0, Math.min(parsed.count, 20)) : 1
     return {
       status: 200,
       json: {
         found: parsed.found !== false,
         observed: String(parsed.observed ?? '').trim().slice(0, 60),
+        count,
+        subject: count > 1 ? String(parsed.subject ?? '').trim().slice(0, 20) : '',
         index: ((raw % hints.length) + hints.length) % hints.length,
       },
     }
