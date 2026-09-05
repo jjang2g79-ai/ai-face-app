@@ -38,64 +38,28 @@ const MOOD_POOLS = {
 
 const SPECIES_KO = { human: '사람', cat: '고양이', dog: '강아지' }
 
-const API_KEY = import.meta.env.VITE_OPENAI_API_KEY
-const MODEL = 'gpt-4o-mini'
 const TIMEOUT_MS = 20000
 
-function buildPrompt(species, pool) {
-  const target = SPECIES_KO[species] ?? '사람'
-  const options = pool.map((e, i) => `${i}: ${e.hint}`).join('\n')
-  return [
-    `이 사진을 보고 아래를 판단해줘. 사용자는 "${target}"의 관상을 요청했다.`,
-    '',
-    '보기:',
-    options,
-    '',
-    '다음 JSON만 출력해라. 설명 금지.',
-    '{',
-    `  "found": true/false,          // 사진에 ${target}이(가) 실제로 있으면 true`,
-    '  "observed": "사진에 보이는 것을 한국어 한 문장으로. 20자 내외",',
-    '  "index": 0~5                  // 보기 중 사진의 인상과 가장 가까운 번호',
-    '}',
-    '',
-    `observed에는 사진이 없다고 쓰지 말고, 화면에 실제로 보이는 것을 적어라.`,
-    `${target}이(가) 없으면 found를 false로 하고 observed에는 대신 무엇이 보이는지 적어라.`,
-    '(예: "회색 배경만 있고 아무것도 없음", "키보드와 책상만 보임")',
-  ].join('\n')
-}
-
 async function askVision(species, dataUrl, pool) {
-  if (!API_KEY) return null
-
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS)
   try {
-    const res = await fetch('https://api.openai.com/v1/chat/completions', {
+    // 키는 서버에만 있다. 브라우저는 우리 엔드포인트만 안다.
+    const res = await fetch('/api/analyze', {
       method: 'POST',
-      headers: {
-        Authorization: `Bearer ${API_KEY}`,
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Content-Type': 'application/json' },
       signal: controller.signal,
       body: JSON.stringify({
-        model: MODEL,
-        max_tokens: 200,
-        response_format: { type: 'json_object' },
-        messages: [{
-          role: 'user',
-          content: [
-            { type: 'text', text: buildPrompt(species, pool) },
-            { type: 'image_url', image_url: { url: dataUrl, detail: 'low' } },
-          ],
-        }],
+        species,
+        dataUrl,
+        hints: pool.map((e) => e.hint),
       }),
     })
     if (!res.ok) {
-      console.error('[vision] HTTP', res.status, (await res.text()).slice(0, 200))
+      console.error('[vision] HTTP', res.status)
       return null
     }
-    const json = await res.json()
-    const parsed = JSON.parse(json.choices[0].message.content)
+    const parsed = await res.json()
     const index = Number.isInteger(parsed.index) ? parsed.index : 0
     return {
       found: parsed.found !== false,
