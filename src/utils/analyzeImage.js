@@ -64,6 +64,8 @@ async function askVision(species, dataUrl, pool) {
     return {
       found: parsed.found !== false,
       observed: String(parsed.observed ?? '').trim(),
+      count: Number.isInteger(parsed.count) ? parsed.count : 1,
+      subject: String(parsed.subject ?? '').trim(),
       index: ((index % pool.length) + pool.length) % pool.length,
     }
   } catch (err) {
@@ -86,6 +88,8 @@ export async function generateAnalysisSummary(species = 'human', dataUrl = '') {
       visualHint: vision.observed || entry.hint,
       _index: vision.index,
       found: vision.found,
+      count: vision.count,
+      subject: vision.subject,
       analyzed: true,
     }
   }

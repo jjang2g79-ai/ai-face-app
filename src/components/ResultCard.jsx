@@ -18,10 +18,17 @@ const FALLBACK_HINTS = {
   dog: '밝고 친근한 에너지가 느껴지는 멍상',
 }
 
-const MULTI_NOTICE = {
-  human: '※ 여러 인물이 있는 사진은 대표 인상 기준으로 분석됩니다.',
-  cat: '※ 여러 고양이가 있는 사진은 대표 냥상 기준으로 분석됩니다.',
-  dog: '※ 여러 강아지가 있는 사진은 대표 멍상 기준으로 분석됩니다.',
+const SUBJECT_UNIT = { human: ['명', '이'], cat: ['마리', '가'], dog: ['마리', '가'] }
+const SUBJECT_NOUN = { human: '사람', cat: '고양이', dog: '강아지' }
+
+// 여럿이 찍힌 사진은 그중 하나만 본다. 예전에는 그 사실을 맨 아래 회색 글씨로만
+// 적어두고 한 명짜리 사진에도 똑같이 띄웠다 — 아무도 읽지 않았고, 누구 결과인지도 몰랐다.
+function multiNotice(species, count, subject) {
+  if (!(count > 1)) return null
+  const [unit, particle] = SUBJECT_UNIT[species] ?? SUBJECT_UNIT.human
+  const noun = SUBJECT_NOUN[species] ?? SUBJECT_NOUN.human
+  const who = subject ? `${subject} ${noun}` : `그중 한 ${unit}`
+  return `이 사진에는 ${count}${unit}${particle} 있어요. ${who} 기준으로 봤습니다.`
 }
 
 // Deterministic hash from a string — same input always yields same number
@@ -42,6 +49,7 @@ export default function ResultCard({ photo, result, analysisSummary, cardRef }) 
   const scoreLabel = SCORE_LABEL[species] ?? '매력도'
   const barWidth = `${result.score}%`
   const showMbti = species === 'human' && result.mbtiCompare
+  const notice = multiNotice(species, analysisSummary?.count, analysisSummary?.subject)
 
   // All derived text computed once per result — stable for save/share/PNG
   const { displayDescription, visualHint } = useMemo(() => {
@@ -125,6 +133,11 @@ export default function ResultCard({ photo, result, analysisSummary, cardRef }) 
         <p className="text-slate-500 text-xs mt-2">
           AI가 본 첫 느낌: <span className="text-violet-400">{visualHint}</span>
         </p>
+        {notice && (
+          <p className="mt-3 bg-amber-500/15 border border-amber-500/40 rounded-xl px-3 py-2 text-amber-300 text-xs leading-relaxed">
+            {notice}
+          </p>
+        )}
       </div>
 
       {/* Description — pool-assembled for cat/dog, fallback for human */}
@@ -177,7 +190,6 @@ export default function ResultCard({ photo, result, analysisSummary, cardRef }) 
           재미로 보는 AI 분석 테스트 · 저장해서 친구에게 보여줘도 좋아요
         </p>
         <p className="text-slate-600 text-xs">※ 재미로 보는 AI 분석 결과입니다.</p>
-        <p className="text-slate-600 text-xs">{MULTI_NOTICE[species] ?? MULTI_NOTICE.human}</p>
       </div>
     </div>
   )
