@@ -18,6 +18,13 @@ const FALLBACK_HINTS = {
   dog: '밝고 친근한 에너지가 느껴지는 멍상',
 }
 
+// 이 카드의 문구를 누가 썼는지 밝힌다. 오래 숨겨온 자리다 —
+// Vision 이 고르기만 하던 시절에도 화면은 "AI 분석 결과"라고만 적혀 있었다.
+const SOURCE_NOTE = {
+  ai: '✍️ 이 결과는 AI가 사진을 보고 직접 쓴 문장입니다.',
+  preset: '※ AI가 문장을 쓰지 못해, 미리 준비된 결과 중에서 골랐습니다.',
+}
+
 const SUBJECT_UNIT = { human: ['명', '이'], cat: ['마리', '가'], dog: ['마리', '가'] }
 const SUBJECT_NOUN = { human: '사람', cat: '고양이', dog: '강아지' }
 
@@ -50,6 +57,7 @@ export default function ResultCard({ photo, result, analysisSummary, cardRef }) 
   const barWidth = `${result.score}%`
   const showMbti = species === 'human' && result.mbtiCompare
   const notice = multiNotice(species, analysisSummary?.count, analysisSummary?.subject)
+  const source = analysisSummary?.source === 'ai' ? 'ai' : 'preset'
 
   // All derived text computed once per result — stable for save/share/PNG
   const { displayDescription, visualHint } = useMemo(() => {
@@ -190,6 +198,7 @@ export default function ResultCard({ photo, result, analysisSummary, cardRef }) 
           재미로 보는 AI 분석 테스트 · 저장해서 친구에게 보여줘도 좋아요
         </p>
         <p className="text-slate-600 text-xs">※ 재미로 보는 AI 분석 결과입니다.</p>
+        <p className="text-slate-500 text-xs pt-1">{SOURCE_NOTE[source]}</p>
       </div>
     </div>
   )

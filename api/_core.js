@@ -41,8 +41,29 @@ function buildPrompt(species, hints) {
     '  "observed": "사진에 보이는 것을 한국어 한 문장으로. 20자 내외",',
     `  "count": 1,                   // 사진에 보이는 ${target}의 수. 없으면 0`,
     '  "subject": "",                // count가 2 이상일 때, 관상을 판단한 대상의 위치를 한국어로',
-    `  "index": 0~${hints.length - 1}                  // 보기 중 사진의 인상과 가장 가까운 번호`,
+    `  "index": 0~${hints.length - 1},                 // 보기 중 사진의 인상과 가장 가까운 번호`,
+    '  "card": {                     // 사진을 보고 직접 쓴 결과. found가 false면 null',
+    '    "brandType": "<6~10자 별명>",',
+    '    "title": "<인상을 한 문장으로. 25자 내외>",',
+    '    "keywords": ["<3~5자>", "<3~5자>", "<3~5자>"],',
+    '    "description": "<두 문장. 70자 내외>",',
+    '    "score": <80~97 사이 정수. 인상에 따라 다르게>,',
+    '    "insights": [',
+    '      "<처음 보는 사람에게 어떻게 보이는지. 40자 내외>",',
+    '      "<가까워지면 달리 보이는 점. 40자 내외>",',
+    '      "<조심하면 좋은 점. 반드시 아쉬운 쪽 이야기. 40자 내외>"',
+    '    ]',
+    '  }',
     '}',
+    '',
+    'card 를 쓸 때 지킬 것:',
+    '- 재미로 보는 인상 이야기다. 따뜻하고 가볍게 쓴다.',
+    '- **외모를 품평하지 마라.** 이목구비·체형·피부·나이·인종·성별을 말하지 마라.',
+    '- 분위기와 표정에서 받은 느낌만 쓴다. 사실을 단정하지 말고 "~해 보여요" 처럼 쓴다.',
+    '- 건강·성격·능력을 진단하지 마라.',
+    `- ${target}이(가) 여럿이어도 **subject 한 명만** 두고 쓴다. "두 사람은" 처럼 쓰지 마라.`,
+    '- brandType 은 흔한 말 대신 이 사진에서만 나올 만한 별명으로 짓는다.',
+    '- 위 예시 형식의 <> 안은 설명이다. 그 말을 그대로 옮겨 쓰지 마라.',
     '',
     `${target}이(가) 여럿이면 가장 크게·정면으로 나온 하나를 골라 index를 매기고,`,
     'subject에는 그게 누구인지 사진에서 실제로 보이는 위치를 적어라.',
@@ -66,6 +87,37 @@ function cleanSubject(value, count) {
   if (!hit) return ''
   if (count === 2 && hit.startsWith('가운데')) return ''
   return hit
+}
+
+// 모델이 쓴 결과 카드를 검사한다. 한 군데라도 어긋나면 통째로 버린다 —
+// 반쯤 비어 있는 카드를 화면에 올리느니 준비된 카드를 쓰고 그렇다고 밝히는 편이 낫다.
+function str(v, max) {
+  const s = String(v ?? '').trim().replace(/\s+/g, ' ')
+  return s.length > 0 && s.length <= max ? s : null
+}
+
+function cleanCard(raw) {
+  if (!raw || typeof raw !== 'object') return null
+  const brandType = str(raw.brandType, 14)
+  const title = str(raw.title, 40)
+  const description = str(raw.description, 120)
+  const score = Number.isFinite(raw.score) ? Math.round(raw.score) : null
+  const keywords = Array.isArray(raw.keywords)
+    ? raw.keywords.map((k) => str(k, 10)).filter(Boolean)
+    : []
+  const insights = Array.isArray(raw.insights)
+    ? raw.insights.map((t) => str(t, 70)).filter(Boolean)
+    : []
+  if (!brandType || !title || !description || score === null) return null
+  if (keywords.length !== 3 || insights.length !== 3) return null
+  return {
+    brandType,
+    title,
+    description,
+    keywords,
+    insights,
+    score: Math.max(80, Math.min(97, score)),
+  }
 }
 
 /**
@@ -97,7 +149,7 @@ export async function analyze({ body, ip, apiKey }) {
       signal: controller.signal,
       body: JSON.stringify({
         model: MODEL,
-        max_tokens: 200,
+        max_tokens: 900,
         response_format: { type: 'json_object' },
         messages: [{
           role: 'user',
@@ -125,6 +177,7 @@ export async function analyze({ body, ip, apiKey }) {
         count,
         subject: cleanSubject(parsed.subject, count),
         index: ((raw % hints.length) + hints.length) % hints.length,
+        card: parsed.found === false ? null : cleanCard(parsed.card),
       },
     }
   } catch (err) {
