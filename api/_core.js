@@ -55,6 +55,19 @@ function buildPrompt(species, hints) {
   ].join('\n')
 }
 
+const POSITIONS = ['왼쪽', '오른쪽', '가운데', '가운데쪽', '앞쪽', '뒤쪽', '위쪽', '아래쪽']
+
+// 위치를 문장으로 지시해도 모델은 두 명뿐인 사진에 "가운데"라고 답하곤 한다.
+// 틀린 위치를 알려주느니 위치를 빼는 편이 낫다 — 화면은 "그중 한 명"으로 받는다.
+function cleanSubject(value, count) {
+  if (!(count > 1)) return ''
+  const raw = String(value ?? '').trim().slice(0, 20)
+  const hit = POSITIONS.find((p) => raw.includes(p))
+  if (!hit) return ''
+  if (count === 2 && hit.startsWith('가운데')) return ''
+  return hit
+}
+
 /**
  * @param {{ body: any, ip: string, apiKey: string|undefined }} input
  * @returns {Promise<{ status: number, json: object }>}
@@ -110,7 +123,7 @@ export async function analyze({ body, ip, apiKey }) {
         found: parsed.found !== false,
         observed: String(parsed.observed ?? '').trim().slice(0, 60),
         count,
-        subject: count > 1 ? String(parsed.subject ?? '').trim().slice(0, 20) : '',
+        subject: cleanSubject(parsed.subject, count),
         index: ((raw % hints.length) + hints.length) % hints.length,
       },
     }
