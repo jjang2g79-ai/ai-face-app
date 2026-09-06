@@ -66,6 +66,7 @@ async function askVision(species, dataUrl, pool) {
       observed: String(parsed.observed ?? '').trim(),
       count: Number.isInteger(parsed.count) ? parsed.count : 1,
       subject: String(parsed.subject ?? '').trim(),
+      card: parsed.card ?? null,
       index: ((index % pool.length) + pool.length) % pool.length,
     }
   } catch (err) {
@@ -90,6 +91,9 @@ export async function generateAnalysisSummary(species = 'human', dataUrl = '') {
       found: vision.found,
       count: vision.count,
       subject: vision.subject,
+      card: vision.card,
+      // 문구를 누가 썼는지. 화면이 이걸 그대로 밝힌다
+      source: vision.card ? 'ai' : 'preset',
       analyzed: true,
     }
   }
